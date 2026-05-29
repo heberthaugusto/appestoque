@@ -12,7 +12,7 @@
 <title>EstoqueMax — Controle de Inventário</title>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/appestoque/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/app-estoquemax/sw.js').catch(() => {});
   }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
@@ -290,12 +290,24 @@
 <div id="screen-contagem" class="screen active">
 
   <!-- Campo: nome da contagem -->
-  <div class="card" style="margin-bottom:12px">
+  <div class="card" style="margin-bottom:8px">
     <div class="section-title">📋 Nome da Contagem</div>
     <input type="text" id="contagem-nome" inputmode="text"
       style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;letter-spacing:1px"
       oninput="saveContagemNome()">
     <p style="font-size:11px;color:var(--muted);margin-top:7px">Este nome será usado como nome do arquivo ao exportar (.txt)</p>
+  </div>
+
+  <!-- Card de totais da contagem -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div class="stat-chip">
+      <div class="stat-val" id="stat-count-products">0</div>
+      <div class="stat-lbl">Produtos</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-val" id="stat-count-qty" style="color:var(--accent2)">0</div>
+      <div class="stat-lbl">Quantidade Total</div>
+    </div>
   </div>
 
   <!-- Botão escanear (visível quando nenhum estado ativo) -->
@@ -504,10 +516,17 @@
 </div>
 
 <!-- MODAL: SCANNER -->
-<div id="scanner-modal" class="modal-overlay">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="scanner-title">📷 Escanear Código de Barras</div>
+<div id="scanner-modal" class="modal-overlay" onclick="handleScannerOverlayClick(event)">
+  <div class="modal" id="scanner-modal-inner">
+    <div id="scanner-handle" style="width:100%;padding:8px 0 4px;cursor:grab;display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:6px">
+      <div style="width:40px;height:4px;background:var(--border);border-radius:2px"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="modal-title" id="scanner-title" style="margin-bottom:0">📷 Escanear Código de Barras</div>
+      <button class="btn-icon" onclick="stopScanner()" style="flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
     <div id="qr-reader"></div>
 
     <!-- Entrada manual dentro do modal do scanner -->
@@ -549,6 +568,10 @@
 
     <div id="scanner-buttons" style="margin-top:12px; display:flex; gap:8px">
       <button class="btn btn-secondary flex-1" onclick="stopScanner()">Fechar Câmera</button>
+      <button class="btn btn-secondary" id="torch-btn" onclick="toggleTorch()" style="width:48px;flex-shrink:0;padding:0;display:none" title="Lanterna">
+        <span id="torch-icon-off" style="font-size:20px">💡</span>
+        <span id="torch-icon-on"  style="font-size:20px;display:none">🔦</span>
+      </button>
       <button class="btn btn-secondary flex-1" onclick="showManualEntry()">⌨️ Inserir Manualmente</button>
     </div>
   </div>
@@ -976,6 +999,16 @@ function onSearchInput() {
 // ══════════════════════ STATS ══════════════════════
 function updateStats() {
   document.getElementById('stat-catalog').textContent = db.catalogCount || 0;
+  updateCountStats();
+}
+
+function updateCountStats() {
+  const products = new Set(db.entries.map(e => e._uncatalogued ? e.barcode : e.productId)).size;
+  const qty = db.entries.reduce((s, e) => s + e.qty, 0);
+  const pEl = document.getElementById('stat-count-products');
+  const qEl = document.getElementById('stat-count-qty');
+  if (pEl) pEl.textContent = products;
+  if (qEl) qEl.textContent = qty;
 }
 
 // ══════════════════════ CATALOG RENDER ══════════════════════
@@ -1098,14 +1131,14 @@ function addDirectEntry(productId) {
 // ══════════════════════ SCANNER ══════════════════════
 function openScanner(mode) {
   scannerMode = mode;
-  // Clear any leftover content in qr-reader before init
   const qrEl = document.getElementById('qr-reader');
   qrEl.innerHTML = '';
-  // Reset manual entry UI
   qrEl.style.display = 'block';
   document.getElementById('manual-entry-area').style.display = 'none';
   document.getElementById('scanner-buttons').style.display = 'flex';
   document.getElementById('scanner-title').textContent = '📷 Escanear Código de Barras';
+  document.getElementById('torch-btn').style.display = 'none';
+  torchOn = false; torchTrack = null;
   openModal('scanner-modal');
   setTimeout(() => {
     scanner = new Html5Qrcode('qr-reader');
@@ -1113,7 +1146,22 @@ function openScanner(mode) {
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 260, height: 110 } },
       onScan, () => {}
-    ).catch(() => { showToast('Não foi possível acessar a câmera', 'error'); closeModal('scanner-modal'); });
+    ).then(() => {
+      // After camera starts, check if torch is supported
+      const stream = scanner?.getRunningTrackCameraCapabilities?.();
+      // Try to get the video track directly from the video element
+      const video = document.querySelector('#qr-reader video');
+      if (video && video.srcObject) {
+        const tracks = video.srcObject.getVideoTracks();
+        if (tracks.length > 0) {
+          const caps = tracks[0].getCapabilities?.();
+          if (caps && caps.torch) {
+            torchTrack = tracks[0];
+            document.getElementById('torch-btn').style.display = 'flex';
+          }
+        }
+      }
+    }).catch(() => { showToast('Não foi possível acessar a câmera', 'error'); closeModal('scanner-modal'); });
   }, 320);
 }
 
@@ -1129,7 +1177,46 @@ async function onScan(code) {
   else { notFoundCode = code; countWithoutCatalog(); }
 }
 
+// ══════════════════════ LANTERNA ══════════════════════
+let torchOn = false;
+let torchTrack = null;
+
+async function toggleTorch() {
+  if (!torchTrack) return;
+  torchOn = !torchOn;
+  try {
+    await torchTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+    document.getElementById('torch-icon-off').style.display = torchOn ? 'none' : 'block';
+    document.getElementById('torch-icon-on').style.display  = torchOn ? 'block' : 'none';
+    const btn = document.getElementById('torch-btn');
+    btn.style.background = torchOn ? 'rgba(255,107,53,0.15)' : '';
+    btn.style.borderColor = torchOn ? 'var(--warn)' : '';
+  } catch(e) {
+    torchOn = !torchOn; // revert
+    showToast('Lanterna não disponível', 'error');
+  }
+}
+
+async function turnOffTorch() {
+  if (torchTrack && torchOn) {
+    try { await torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch(e) {}
+  }
+  torchOn = false;
+  torchTrack = null;
+  const btn = document.getElementById('torch-btn');
+  if (btn) {
+    btn.style.display = 'none';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+  }
+  const offIcon = document.getElementById('torch-icon-off');
+  const onIcon  = document.getElementById('torch-icon-on');
+  if (offIcon) offIcon.style.display = 'block';
+  if (onIcon)  onIcon.style.display  = 'none';
+}
+
 function stopScanner() {
+  turnOffTorch();
   if (scanner) {
     scanner.stop().then(() => { scanner.clear(); scanner = null; }).catch(() => { scanner = null; });
   }
@@ -1171,6 +1258,41 @@ function countWithoutCatalog() {
 }
 
 function cancelCount() { resetCountUI(); }
+
+function handleScannerOverlayClick(e) {
+  // Close if clicking the dark backdrop area above the modal sheet
+  if (e.target === document.getElementById('scanner-modal')) {
+    stopScanner();
+  }
+}
+
+// Drag down the scanner modal handle to close it
+(function() {
+  let startY = 0, isDragging = false;
+  const getHandle = () => document.getElementById('scanner-handle');
+
+  document.addEventListener('touchstart', e => {
+    const h = getHandle();
+    if (!h) return;
+    // Allow drag anywhere on the modal header area (handle + title)
+    const modal = document.getElementById('scanner-modal-inner');
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    const touchY = e.touches[0].clientY;
+    // Detect touch in the top 60px of the modal (handle + title area)
+    if (touchY >= rect.top && touchY <= rect.top + 60) {
+      startY = touchY;
+      isDragging = true;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!isDragging) return;
+    isDragging = false;
+    const diff = e.changedTouches[0].clientY - startY;
+    if (diff > 50) stopScanner();
+  }, { passive: true });
+})();
 
 function showManualEntry() {
   if (scanner) { scanner.pause(); }
@@ -1296,6 +1418,10 @@ async function renderCountList() {
       return prod && (prod.name.toLowerCase().includes(query) || prod.barcode.includes(query) || (prod.sku||'').toLowerCase().includes(query));
     });
   }
+
+  // Show/hide scan CTA card based on whether there are any entries today
+  const scanCta = document.getElementById('scan-cta');
+  if (scanCta) scanCta.style.display = db.entries.length > 0 ? 'none' : 'block';
 
   // Show/hide danger zone based on whether there are any entries at all
   clearEl.style.display = db.entries.length > 0 ? 'block' : 'none';
@@ -1501,33 +1627,39 @@ function saveContagemNome() {
   localStorage.setItem('estoquemax_contagem_nome', document.getElementById('contagem-nome').value);
 }
 
+// txt2: sum quantities per barcode (one line per product, regardless of expiry)
+function getTxt2Content(rows) {
+  const totals = new Map();
+  rows.forEach(r => {
+    const bc = r.barcode;
+    totals.set(bc, (totals.get(bc) || 0) + r.qty);
+  });
+  return [...totals.entries()]
+    .map(([bc, qty]) => `${bc.padEnd(14,' ')};${String(qty).padStart(5,'0')}`)
+    .join('\r\n');
+}
+
 async function sendToDrive() {
   const nome = getContagemNome();
   const rows = await getAllEntryRows();
   if (!rows.length) { showToast('Nenhum lançamento para exportar!', 'error'); return; }
 
-  // Save to history before exporting
   saveToHistory(nome, db.entries);
 
   const txt1 = rows.map(r => `${r.sku}|${r.barcode}|${r.name}|${expiryToShort(r.expiry)}|${r.qty}`).join('\r\n');
-  const txt2 = rows.map(r => `${r.barcode.padEnd(14,' ')};${String(r.qty).padStart(5,'0')}`).join('\r\n');
+  const txt2 = getTxt2Content(rows);
 
   const file1 = new File([txt1], nome + '_validade.txt', { type: 'text/plain' });
   const file2 = new File([txt2], nome + '.txt',          { type: 'text/plain' });
 
-  // Use Web Share API if available (Android Chrome supports file sharing)
   if (navigator.canShare && navigator.canShare({ files: [file1, file2] })) {
     try {
-      await navigator.share({
-        files: [file1, file2],
-        title: nome
-      });
+      await navigator.share({ files: [file1, file2], title: nome });
       showToast('Arquivos compartilhados ✓', 'success');
     } catch (e) {
       if (e.name !== 'AbortError') showToast('Erro ao compartilhar', 'error');
     }
   } else {
-    // Fallback: download both files
     showToast('Compartilhamento não suportado, baixando...', 'warn');
     dlFile(nome + '_validade.txt', txt1, 'text/plain;charset=utf-8');
     setTimeout(() => dlFile(nome + '.txt', txt2, 'text/plain;charset=utf-8'), 400);
@@ -1539,11 +1671,10 @@ async function exportTXT() {
   const rows = await getAllEntryRows();
   if (!rows.length) { showToast('Nenhum lançamento para exportar!', 'error'); return; }
 
-  // Save to history before exporting
   saveToHistory(nome, db.entries);
 
   const txt1 = rows.map(r => `${r.sku}|${r.barcode}|${r.name}|${expiryToShort(r.expiry)}|${r.qty}`).join('\r\n');
-  const txt2 = rows.map(r => `${r.barcode.padEnd(14,' ')};${String(r.qty).padStart(5,'0')}`).join('\r\n');
+  const txt2 = getTxt2Content(rows);
 
   dlFile(nome + '_validade.txt', txt1, 'text/plain;charset=utf-8');
   setTimeout(() => dlFile(nome + '.txt', txt2, 'text/plain;charset=utf-8'), 400);
@@ -1671,7 +1802,11 @@ function deleteEntryFromEdit() {
 function clearAllData() {
   closeModal('clear-count-modal');
   db.entries = [];
-  saveEntries(); renderCountList(); updateStats(); showToast('Contagem limpa', 'error');
+  saveEntries(); renderCountList(); updateStats();
+  // Clear the report preview immediately so it doesn't accumulate with the next count
+  const preview = document.getElementById('report-preview');
+  if (preview) preview.textContent = 'Nenhum lançamento registrado.';
+  showToast('Contagem limpa', 'error');
 }
 
 // ══════════════════════ MODALS ══════════════════════
