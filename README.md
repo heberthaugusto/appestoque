@@ -1,6 +1,6 @@
-# 📦 EstoqueMax — Controle de Inventário Mobile
+# 📦 EstoqueMax — Aplicativo de Controle de Inventário
 
-> Aplicativo web progressivo (PWA) desenvolvido para realizar contagem de estoque com leitura de código de barras pela câmera, controle de validades e exportação de arquivos para integração com sistemas de gestão.
+> Aplicativo mobile desenvolvido para realizar coleta e controle de estoque com leitura de código de barras pela câmera, suporte a múltiplas datas de validade por produto e exportação de arquivos para integração com sistemas de gestão (ERP/WMS).
 
 [![HTML](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![CSS](https://img.shields.io/badge/CSS3-1572B6?style=flat&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
@@ -16,57 +16,79 @@
 |---|---|
 | 📦 EstoqueMax App | [heberthaugusto.github.io/portfolio-app-estoquemax](https://heberthaugusto.github.io/portfolio-app-estoquemax/) |
 
-> ℹ️ Para a experiência completa, acesse pelo **Chrome no Android** e instale como app via "Adicionar à tela inicial" → "Instalar". A leitura de código de barras pela câmera requer acesso via HTTPS.
+> ℹ️ Para a experiência completa, acesse pelo **Chrome no Android** e instale via "Instalar app" nos 3 pontinhos. A leitura de código de barras pela câmera requer HTTPS.
 
 ---
 
 ## 🎯 Sobre o Projeto
 
-O **EstoqueMax** nasceu da necessidade real de uma ferramenta de contagem de inventário que resolvesse um problema específico: registrar o mesmo produto com **múltiplas datas de validade distintas** — funcionalidade ausente nos aplicativos comerciais disponíveis.
+O **EstoqueMax** nasceu de uma necessidade real identificada durante o processo de recebimento e controle de mercadorias: os aplicativos de inventário disponíveis não permitem registrar o **mesmo produto com múltiplas datas de validade distintas** em uma única coleta — ao lançar uma segunda validade, a anterior era substituída.
 
-O resultado é um PWA que funciona como um aplicativo nativo no Android, capaz de ler códigos de barras pela câmera, identificar produtos por um catálogo importável, registrar quantidades por validade e exportar os dados em formatos prontos para integração com sistemas de gestão (ERP/WMS).
+### Casos de uso
+
+**Recebimento de mercadoria** — ao receber um lote, o operador escaneia cada produto com a câmera, informa a data de validade estampada na embalagem e a quantidade recebida. Se o mesmo produto chegar com lotes de datas diferentes (o que é comum em produtos alimentícios e de higiene), cada validade é registrada separadamente. Ao final, o app exporta os arquivos prontos para importação no sistema de gestão.
+
+**Controle de validades** — o arquivo `_validade.txt` exportado alimenta diretamente planilhas ou sistemas de controle de vencimento, com uma linha por lote de validade, permitindo rastrear exatamente quais unidades vencem em cada data e planejar a rotatividade do estoque com precisão.
+
+**Inventário periódico** — o operador percorre as prateleiras escaneando os produtos. O app identifica automaticamente cada produto pelo catálogo importado, registra a quantidade contada e ao final gera dois arquivos: um com o detalhamento por validade e outro no formato de coletor para importação no ERP.
 
 ---
 
 ## ✨ Funcionalidades Implementadas
 
-### 📷 Contagem de Estoque
-- Leitura automática de código de barras pela câmera traseira do dispositivo
-- Identificação instantânea do produto pelo catálogo via IndexedDB (busca por índice)
-- Inserção manual de código de barras com busca simultânea por SKU ou nome
-- Suporte a produtos **sem data de validade** (campo opcional)
-- Um mesmo produto pode ter **múltiplas validades** registradas separadamente
-- Produtos não cadastrados no catálogo são registrados pelo código lido
+### 📷 Coleta de Estoque
+- Leitura automática de código de barras pela câmera traseira (EAN-13, EAN-8, Code 128)
+- Identificação instantânea do produto pelo catálogo importado via IndexedDB
+- Inserção manual de código com busca simultânea por **SKU ou nome** — prioriza correspondência exata de SKU
+- **Múltiplas validades** por produto — cada validade gera uma linha separada no arquivo exportado
+- Data de validade **opcional** — suporta produtos sem validade
+- 💡 **Lanterna integrada** — botão para acender/apagar a lanterna do celular diretamente na tela da câmera, sem sair do app; desliga automaticamente ao fechar a câmera
 - Edição e exclusão de lançamentos após registro
+- Card com **totais em tempo real**: quantidade de produtos distintos e total de unidades contadas
 - Botão flutuante de acesso rápido ao scanner
 
 ### 📂 Catálogo de Produtos
-- Importação de catálogo via arquivo `.txt` com separador `|` (pipeline)
-- Suporte a catálogos grandes (testado com +60.000 produtos)
-- Importação em lotes assíncronos com barra de progresso — sem travamento
-- Cadastro manual de produtos com código de barras, nome, SKU, categoria e unidade
-- Busca por nome, código de barras ou SKU em tempo real
-- Busca por SKU com priorização de correspondência exata
+- Importação via arquivo `.txt` com separador `|` — testado com **63.000+ produtos**
+- Importação assíncrona em lotes com barra de progresso — sem travamento da UI
+- **Importação incremental** — produtos já cadastrados são ignorados automaticamente
+- Cadastro manual com código de barras, nome, SKU, categoria e unidade
+- Busca em tempo real por nome, código de barras ou SKU (IndexedDB com índices)
 
 ### 📄 Exportação
-- Gera **dois arquivos `.txt`** simultaneamente ao exportar:
-  - `NOME_validade.txt` — 4 colunas separadas por `|`: código, nome, validade, quantidade
-  - `NOME.txt` — 2 colunas: código (14 chars, padding direito) + quantidade (5 dígitos, zeros à esquerda)
-- Integração com **Google Drive** via Web Share API nativa do Android
-- Nome do arquivo configurável pelo campo "Nome da Contagem"
-- Prévia do relatório em tela antes de exportar
+Ao exportar, **dois arquivos `.txt` são gerados simultaneamente**:
 
-### 🕐 Histórico
-- Registro automático das últimas **20 contagens exportadas**
-- Possibilidade de recarregar uma contagem anterior na tela de trabalho
-- Confirmação de segurança ao sobrescrever contagem em andamento
+**`NOME_validade.txt`** — detalhamento completo com uma linha por lote de validade:
 
-### ⚙️ Outras Funcionalidades
-- Funciona **100% offline** após instalação
-- Dados persistidos localmente via **IndexedDB** (catálogo) e **localStorage** (contagens)
-- Suporte a PWA: instalável na tela inicial, abre sem barra do navegador
-- Service Worker para cache e funcionamento offline
-- Interface responsiva otimizada para uso com uma mão
+| Coluna | Conteúdo | Exemplo |
+|---|---|---|
+| 1 | SKU | `572` |
+| 2 | Código de barras | `7896051115090` |
+| 3 | Nome do produto | `LEITE CONDENSADO ITAMBE 1KG` |
+| 4 | Data de validade (DD-MM-AA) | `09-01-27` |
+| 5 | Quantidade | `48` |
+
+```
+572|7896051115090|LEITE CONDENSADO ITAMBE 1KG|09-01-27|48
+572|7896051115090|LEITE CONDENSADO ITAMBE 1KG|04-04-27|60
+```
+
+**`NOME.txt`** — formato coletor para importação no ERP, com quantidades totais por produto:
+
+| Coluna | Conteúdo | Regra |
+|---|---|---|
+| 1 | Código de barras | 14 caracteres — espaços à direita |
+| 2 | Quantidade total | 5 dígitos — zeros à esquerda · soma todas as validades |
+
+```
+7896051115090 ;00108
+```
+
+Integração com **Google Drive** via Web Share API nativa do Android — um toque para enviar direto para a pasta desejada.
+
+### 🕐 Histórico de Contagens
+- Registro automático das últimas **20 coletas exportadas** com nome, data/hora e quantidade de lançamentos
+- Recarregamento de qualquer coleta anterior diretamente na tela de trabalho
+- Confirmação obrigatória antes de substituir uma contagem em andamento — evita perda acidental de dados
 
 ---
 
@@ -74,54 +96,39 @@ O resultado é um PWA que funciona como um aplicativo nativo no Android, capaz d
 
 | Decisão | Justificativa |
 |---|---|
-| **PWA (sem framework)** | Instalável como app nativo sem loja de aplicativos. Vanilla JS mantém o app em um único arquivo `.html`, facilitando distribuição e atualização via GitHub Pages. |
-| **IndexedDB para catálogo** | localStorage tem limite de ~5 MB — insuficiente para catálogos com +60k produtos (~9,5 MB). IndexedDB suporta centenas de MB sem limite prático. |
-| **localStorage para contagens** | Contagens ativas têm poucos registros. localStorage é síncrono e mais simples para dados pequenos e frequentemente acessados. |
-| **Busca por índice IDB** | Com 14k–60k produtos, cursor scan seria lento. Índices IDB permitem lookup O(log n) por barcode/SKU/nome — busca instantânea. |
-| **html5-qrcode** | Biblioteca madura para leitura de códigos de barras (EAN-13, EAN-8, Code 128, QR Code) via câmera no browser, sem app nativo. |
-| **Importação assíncrona em lotes** | Evita travamento da UI ao importar arquivos grandes. Processa 2.000 registros por tick do event loop com feedback de progresso. |
-| **Web Share API** | Permite compartilhar arquivos diretamente para o Google Drive (ou qualquer app instalado) sem intermediários — menos cliques para o usuário. |
-| **GitHub Pages** | Hospedagem estática gratuita com HTTPS, necessário para acesso à câmera no Chrome. |
-
----
-
-## 📐 Formato dos Arquivos
-
-### Arquivo de Catálogo (importação)
-```
-CÓDIGO_DE_BARRAS|NOME DO PRODUTO|SKU
-7896051115090|LEITE CONDENSADO ITAMBE 1KG|572
-7891008405019|BALA TOFEE GAROTO 200G|1234
-2686|FITA CETIM LISA 10M|2686
-```
-
-### Arquivo de Exportação — Validades (`NOME_validade.txt`)
-```
-7896051115090|LEITE CONDENSADO ITAMBE 1KG|09-01-27|48
-7891008405019|BALA TOFEE GAROTO 200G|26-11-26|72
-```
-
-### Arquivo de Exportação — Coletor (`NOME.txt`)
-```
-7896051115090 ;00048
-7891008405019 ;00072
-```
-> Código de barras: 14 caracteres (padding com espaços à direita)
-> Quantidade: 5 dígitos (padding com zeros à esquerda)
+| **PWA sem framework** | Instalável como app nativo sem loja de aplicativos. Single-file HTML facilita distribuição, versionamento e deploy via GitHub Pages. |
+| **IndexedDB para catálogo** | localStorage tem limite de ~5 MB — insuficiente para catálogos com 60k+ produtos (~9,5 MB). IndexedDB suporta centenas de MB sem limitação prática. |
+| **localStorage para contagens** | Lançamentos ativos têm poucos registros. localStorage é síncrono e mais direto para dados pequenos e frequentemente atualizados. |
+| **Índices IDB para busca** | Com 60k+ produtos, cursor scan seria lento. Índices por `barcode`, `sku` e `name` permitem lookup O(log n) — busca instantânea independente do tamanho do catálogo. |
+| **Importação assíncrona em lotes** | Processar 60k registros de uma vez trava a UI e estoura o localStorage. Lotes de 2.000 registros com `await new Promise(r => setTimeout(r, 0))` mantêm o browser responsivo. |
+| **html5-qrcode** | Biblioteca madura para leitura de códigos via câmera no browser, sem app nativo. Suporta os principais formatos de código de barras usados no varejo. |
+| **Web Share API** | Permite compartilhar arquivos gerados diretamente para o Google Drive (ou qualquer app instalado) sem intermediários — menos cliques para o usuário final. |
+| **Service Worker** | Cache offline para funcionamento sem internet após instalação. Atualização automática de versão sem necessidade de reinstalar o app. |
 
 ---
 
 ## 🛠️ Stack Tecnológica
 
 ```
-Frontend:        HTML5 · CSS3 · JavaScript (ES2022)
-Armazenamento:   IndexedDB · localStorage
-Scanner:         html5-qrcode (CDN)
-Tipografia:      Space Grotesk · JetBrains Mono (Google Fonts)
-Hospedagem:      GitHub Pages
-PWA:             Web App Manifest · Service Worker
+Frontend:         HTML5 · CSS3 · JavaScript (ES2022)
+Armazenamento:    IndexedDB · localStorage
+Scanner:          html5-qrcode (CDN)
+Tipografia:       Space Grotesk · JetBrains Mono (Google Fonts)
+Hospedagem:       GitHub Pages (HTTPS automático)
+PWA:              Web App Manifest · Service Worker
 Compartilhamento: Web Share API
 ```
+
+---
+
+## 📱 Como Instalar no Android
+
+1. Acesse o link pelo **Chrome**
+2. Toque nos **3 pontinhos** → **"Instalar app"**
+3. O app é adicionado à tela inicial e abre em tela cheia, sem barra do navegador
+4. Na primeira abertura, permita o acesso à câmera
+
+> Funciona offline após a instalação. Atualizações são aplicadas automaticamente na próxima abertura com internet.
 
 ---
 
@@ -130,53 +137,164 @@ Compartilhamento: Web Share API
 ```
 portfolio-app-estoquemax/
 ├── index.html       Aplicativo completo (single-file PWA)
-├── manifest.json    Configuração PWA (nome, ícone, tema)
+├── manifest.json    Configuração PWA (nome, ícone, start_url)
 ├── sw.js            Service Worker (cache offline)
-├── icon-192.png     Ícone para tela inicial (192×192)
-├── icon-512.png     Ícone para splash screen (512×512)
+├── icon-192.png     Ícone para tela inicial (192×192 px)
+├── icon-512.png     Ícone para splash screen (512×512 px)
 └── README.md        Este arquivo
+```
+
+---
+
+## 👤 Autor
+
+Desenvolvido por **Heberth Augusto**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/heberth-dornela-ti/)
+[![GitHub](https://img.shields.io/badge/GitHub-100000?style=flat&logo=github&logoColor=white)](https://github.com/heberthaugusto)
+
+---
+
+*Projeto desenvolvido utilizando a **Claude IA** como assistente de desenvolvimento.*
+
+
+> Aplicativo mobile desenvolvido para realizar coleta e controle de estoque com leitura de código de barras pela câmera, suporte a múltiplas datas de validade por produto e exportação de arquivos para integração com sistemas de gestão (ERP/WMS).
+
+[![HTML](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+[![CSS](https://img.shields.io/badge/CSS3-1572B6?style=flat&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=flat&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![IndexedDB](https://img.shields.io/badge/IndexedDB-003B57?style=flat&logo=sqlite&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
+
+---
+
+## 🌐 Demo ao Vivo
+
+| Portal | Link |
+|---|---|
+| 📦 EstoqueMax App | [heberthaugusto.github.io/portfolio-app-estoquemax](https://heberthaugusto.github.io/portfolio-app-estoquemax/) |
+
+> ℹ️ Para a experiência completa, acesse pelo **Chrome no Android** e instale via "Instalar app" nos 3 pontinhos. A leitura de código de barras pela câmera requer HTTPS.
+
+---
+
+## 🎯 Sobre o Projeto
+
+O **EstoqueMax** nasceu de uma necessidade real: os aplicativos de inventário disponíveis no mercado não permitem registrar o **mesmo produto com múltiplas datas de validade distintas** em uma única coleta — ao lançar uma segunda validade, a anterior era substituída.
+
+A solução foi um PWA (Progressive Web App) que funciona como app nativo no Android, sem loja de aplicativos, com funcionamento offline e exportação de arquivos nos formatos exatos exigidos pelo sistema de gestão da empresa.
+
+---
+
+## ✨ Funcionalidades Implementadas
+
+### 📷 Coleta de Estoque
+- Leitura automática de código de barras pela câmera traseira (EAN-13, EAN-8, Code 128)
+- Identificação instantânea do produto pelo catálogo importado via IndexedDB
+- Inserção manual de código com busca simultânea por **SKU ou nome** — prioriza correspondência exata de SKU
+- **Múltiplas validades** por produto — cada validade gera uma linha separada no arquivo exportado
+- Data de validade **opcional** — suporta produtos sem validade
+- 💡 Botão de **lanterna** integrado na câmera — desliga automaticamente ao sair
+- Edição e exclusão de lançamentos após registro
+- Card com **totais em tempo real**: quantidade de produtos distintos e total de unidades contadas
+- Botão flutuante de acesso rápido ao scanner
+
+### 📂 Catálogo de Produtos
+- Importação via arquivo `.txt` com separador `|` — testado com **63.000+ produtos**
+- Importação assíncrona em lotes com barra de progresso — sem travamento da UI
+- **Importação incremental** — produtos já cadastrados são ignorados automaticamente
+- Cadastro manual com código de barras, nome, SKU, categoria e unidade
+- Busca em tempo real por nome, código de barras ou SKU (IndexedDB com índices)
+
+### 📄 Exportação
+Ao exportar, **dois arquivos `.txt` são gerados simultaneamente**:
+
+- **`NOME_validade.txt`** — 5 colunas: `SKU | Cód.Barras | Nome | Validade | Qtd` — uma linha por validade
+- **`NOME.txt`** — 2 colunas: código (14 chars) + quantidade total (5 dígitos, zeros à esquerda) — quantidades somadas por produto
+
+Integração com **Google Drive** via Web Share API nativa do Android — um toque para enviar direto para a pasta desejada.
+
+### 🕐 Histórico
+- Registro automático das últimas **20 coletas exportadas**
+- Recarregamento de coleta anterior com confirmação de segurança antes de substituir dados em andamento
+
+---
+
+## 🏗️ Arquitetura e Decisões Técnicas
+
+| Decisão | Justificativa |
+|---|---|
+| **PWA sem framework** | Instalável como app nativo sem loja de aplicativos. Single-file HTML facilita distribuição, versionamento e deploy via GitHub Pages. |
+| **IndexedDB para catálogo** | localStorage tem limite de ~5 MB — insuficiente para catálogos com 60k+ produtos (~9,5 MB). IndexedDB suporta centenas de MB sem limitação prática. |
+| **localStorage para contagens** | Lançamentos ativos têm poucos registros. localStorage é síncrono e mais direto para dados pequenos e frequentemente atualizados. |
+| **Índices IDB para busca** | Com 60k+ produtos, cursor scan seria lento. Índices por `barcode`, `sku` e `name` permitem lookup O(log n) — busca instantânea independente do tamanho do catálogo. |
+| **Importação assíncrona em lotes** | Processar 60k registros de uma vez trava a UI e estoura o localStorage. Lotes de 2.000 registros com `await new Promise(r => setTimeout(r, 0))` mantêm o browser responsivo. |
+| **html5-qrcode** | Biblioteca madura para leitura de códigos via câmera no browser, sem app nativo. Suporta os principais formatos de código de barras usados no varejo. |
+| **Web Share API** | Permite compartilhar arquivos gerados diretamente para o Google Drive (ou qualquer app instalado) sem intermediários — menos cliques para o usuário final. |
+| **Service Worker** | Cache offline para funcionamento sem internet após instalação. Atualização automática de versão sem necessidade de reinstalar o app. |
+
+---
+
+## 📐 Formato dos Arquivos
+
+### Catálogo (entrada)
+```
+CÓDIGO_DE_BARRAS|NOME DO PRODUTO|SKU
+7896051115090|LEITE CONDENSADO ITAMBE 1KG|572
+7891008405019|BALA TOFEE GAROTO 200G|1234
+2686|FITA CETIM LISA 10M|2686
+```
+
+### Exportação — Validades (`NOME_validade.txt`)
+```
+572|7896051115090|LEITE CONDENSADO ITAMBE 1KG|09-01-27|48
+572|7896051115090|LEITE CONDENSADO ITAMBE 1KG|04-04-27|60
+```
+
+### Exportação — Coletor (`NOME.txt`)
+```
+7896051115090 ;00108
+```
+> Código: 14 caracteres com espaços à direita · Quantidade: 5 dígitos com zeros à esquerda · Quantidades somadas por produto
+
+---
+
+## 🛠️ Stack Tecnológica
+
+```
+Frontend:         HTML5 · CSS3 · JavaScript (ES2022)
+Armazenamento:    IndexedDB · localStorage
+Scanner:          html5-qrcode (CDN)
+Tipografia:       Space Grotesk · JetBrains Mono (Google Fonts)
+Hospedagem:       GitHub Pages (HTTPS automático)
+PWA:              Web App Manifest · Service Worker
+Compartilhamento: Web Share API
 ```
 
 ---
 
 ## 📱 Como Instalar no Android
 
-1. Acesse o link do app pelo **Chrome**
-2. Toque nos **3 pontinhos** (⋮) → **"Instalar app"**
-3. Confirme a instalação
-4. O app aparece na tela inicial e abre em tela cheia, sem barra do navegador
+1. Acesse o link pelo **Chrome**
+2. Toque nos **3 pontinhos** → **"Instalar app"**
+3. O app é adicionado à tela inicial e abre em tela cheia, sem barra do navegador
+4. Na primeira abertura, permita o acesso à câmera
 
-> Na primeira abertura após instalação, o Service Worker faz cache dos arquivos para uso offline.
-
----
-
-## ⚙️ Como Fazer Deploy
-
-1. Clone o repositório:
-```bash
-git clone https://github.com/heberthaugusto/portfolio-app-estoquemax.git
-```
-
-2. Faça upload dos 5 arquivos no repositório GitHub:
-```
-index.html · manifest.json · sw.js · icon-192.png · icon-512.png
-```
-
-3. Ative o **GitHub Pages**:
-   - Settings → Pages → Source: Deploy from branch → `main` / `root`
-
-4. Acesse em:
-```
-https://SEU_USUARIO.github.io/portfolio-app-estoquemax/
-```
-
-> Nenhuma dependência de servidor, banco de dados externo ou variável de ambiente. Tudo roda no browser do usuário.
+> Funciona offline após a instalação. Atualizações são aplicadas automaticamente na próxima abertura com internet.
 
 ---
 
-## 🔒 Privacidade e Dados
+## 📁 Estrutura do Projeto
 
-Todos os dados (catálogo, contagens, histórico) são armazenados **exclusivamente no dispositivo do usuário** via IndexedDB e localStorage. Nenhuma informação é enviada para servidores externos. O app não requer login, conta ou conexão com a internet após o primeiro carregamento.
+```
+portfolio-app-estoquemax/
+├── index.html       Aplicativo completo (single-file PWA)
+├── manifest.json    Configuração PWA (nome, ícone, start_url)
+├── sw.js            Service Worker (cache offline)
+├── icon-192.png     Ícone para tela inicial (192×192 px)
+├── icon-512.png     Ícone para splash screen (512×512 px)
+└── README.md        Este arquivo
+```
 
 ---
 
